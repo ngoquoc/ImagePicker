@@ -39,25 +39,39 @@ typedef enum : NSUInteger {
     PHAuthorizationStatus status = [PHPhotoLibrary authorizationStatus];
     if (status == PHAuthorizationStatusAuthorized) {
         NSLog(@"Access has been granted.");
-        
+
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } else if (status == PHAuthorizationStatusDenied) {
         NSString* message = @"Access has been denied. Change your setting > this app > Photo enable";
         NSLog(@"%@", message);
-        
+
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:message];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } else if (status == PHAuthorizationStatusNotDetermined) {
         // Access has not been determined. requestAuthorization: is available
-        [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {}];
-        
-        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
+            if (status == PHAuthorizationStatusAuthorized) {
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            } else if (status == PHAuthorizationStatusDenied) {
+                NSString* message = @"Access has been denied. Change your setting > this app > Photo enable";
+                NSLog(@"%@", message);
+
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:message];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            } else if (status == PHAuthorizationStatusRestricted) {
+                NSString* message = @"Access has been restricted. Change your setting > Privacy > Photo enable";
+                NSLog(@"%@", message);
+
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:message];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            }
+        }];
     } else if (status == PHAuthorizationStatusRestricted) {
         NSString* message = @"Access has been restricted. Change your setting > Privacy > Photo enable";
         NSLog(@"%@", message);
-        
+
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:message];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }
