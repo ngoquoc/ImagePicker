@@ -39,17 +39,42 @@ typedef enum : NSUInteger {
     PHAuthorizationStatus status = [PHPhotoLibrary authorizationStatus];
     if (status == PHAuthorizationStatusAuthorized) {
         NSLog(@"Access has been granted.");
+
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } else if (status == PHAuthorizationStatusDenied) {
-        NSLog(@"Access has been denied. Change your setting > this app > Photo enable");
+        NSString* message = @"Access has been denied. Change your setting > this app > Photo enable";
+        NSLog(@"%@", message);
+
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:message];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     } else if (status == PHAuthorizationStatusNotDetermined) {
         // Access has not been determined. requestAuthorization: is available
-        [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {}];
-    } else if (status == PHAuthorizationStatusRestricted) {
-        NSLog(@"Access has been restricted. Change your setting > Privacy > Photo enable");
-    }
+        [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
+            if (status == PHAuthorizationStatusAuthorized) {
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            } else if (status == PHAuthorizationStatusDenied) {
+                NSString* message = @"Access has been denied. Change your setting > this app > Photo enable";
+                NSLog(@"%@", message);
 
-    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:message];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            } else if (status == PHAuthorizationStatusRestricted) {
+                NSString* message = @"Access has been restricted. Change your setting > Privacy > Photo enable";
+                NSLog(@"%@", message);
+
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:message];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            }
+        }];
+    } else if (status == PHAuthorizationStatusRestricted) {
+        NSString* message = @"Access has been restricted. Change your setting > Privacy > Photo enable";
+        NSLog(@"%@", message);
+
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:message];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }
 }
 
 - (void) getPictures:(CDVInvokedUrlCommand *)command {
@@ -58,9 +83,10 @@ typedef enum : NSUInteger {
 
     self.outputType = [[options objectForKey:@"outputType"] integerValue];
     BOOL allow_video = [[options objectForKey:@"allow_video" ] boolValue ];
+    NSInteger maximumImagesCount = [[options objectForKey:@"maximumImagesCount"] integerValue];
     NSString * title = [options objectForKey:@"title"];
     NSString * message = [options objectForKey:@"message"];
-	BOOL disable_popover = [[options objectForKey:@"disable_popover" ] boolValue];
+    BOOL disable_popover = [[options objectForKey:@"disable_popover" ] boolValue];
     if (message == (id)[NSNull null]) {
       message = nil;
     }
@@ -69,27 +95,28 @@ typedef enum : NSUInteger {
     self.quality = [[options objectForKey:@"quality"] integerValue];
 
     self.callbackId = command.callbackId;
-    [self launchGMImagePicker:allow_video title:title message:message disable_popover:disable_popover];
+    [self launchGMImagePicker:allow_video title:title message:message disable_popover:disable_popover maximumImagesCount:maximumImagesCount];
 }
 
-- (void)launchGMImagePicker:(bool)allow_video title:(NSString *)title message:(NSString *)message disable_popover:(BOOL)disable_popover
+- (void)launchGMImagePicker:(bool)allow_video title:(NSString *)title message:(NSString *)message disable_popover:(BOOL)disable_popover maximumImagesCount:(NSInteger)maximumImagesCount
 {
     GMImagePickerController *picker = [[GMImagePickerController alloc] init:allow_video];
     picker.delegate = self;
+    picker.maximumImagesCount = maximumImagesCount;
     picker.title = title;
     picker.customNavigationBarPrompt = message;
     picker.colsInPortrait = 4;
     picker.colsInLandscape = 6;
     picker.minimumInteritemSpacing = 2.0;
 
-	if(!disable_popover) {
-	    picker.modalPresentationStyle = UIModalPresentationPopover;
+    if(!disable_popover) {
+        picker.modalPresentationStyle = UIModalPresentationPopover;
 
-	    UIPopoverPresentationController *popPC = picker.popoverPresentationController;
-	    popPC.permittedArrowDirections = UIPopoverArrowDirectionAny;
-	    popPC.sourceView = picker.view;
-	    //popPC.sourceRect = nil;
-	}
+        UIPopoverPresentationController *popPC = picker.popoverPresentationController;
+        popPC.permittedArrowDirections = UIPopoverArrowDirectionAny;
+        popPC.sourceView = picker.view;
+        //popPC.sourceRect = nil;
+    }
 
     [self.viewController showViewController:picker sender:nil];
 }
@@ -150,7 +177,11 @@ typedef enum : NSUInteger {
 
 - (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker
 {
-    [picker.presentingViewController dismissViewControllerAnimated:YES completion:nil];
+    CDVPluginResult* pluginResult = nil;
+    NSArray* emptyArray = [NSArray array];
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:emptyArray];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+    [self.viewController dismissViewControllerAnimated:YES completion:nil];
     NSLog(@"UIImagePickerController: User pressed cancel button");
 }
 
@@ -235,7 +266,12 @@ typedef enum : NSUInteger {
 //Optional implementation:
 -(void)assetsPickerControllerDidCancel:(GMImagePickerController *)picker
 {
-    NSLog(@"GMImagePicker: User pressed cancel button");
+   CDVPluginResult* pluginResult = nil;
+   NSArray* emptyArray = [NSArray array];
+   pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:emptyArray];
+   [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+   [picker.presentingViewController dismissViewControllerAnimated:YES completion:nil];
+   NSLog(@"GMImagePicker: User pressed cancel button");
 }
 
 

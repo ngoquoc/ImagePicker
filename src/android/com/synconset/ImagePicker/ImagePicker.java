@@ -9,6 +9,9 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Bundle;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
@@ -110,7 +113,11 @@ public class ImagePicker extends CordovaPlugin {
 
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (resultCode == Activity.RESULT_OK && data != null) {
-            ArrayList<String> fileNames = data.getStringArrayListExtra("MULTIPLEFILENAMES");
+            int sync = data.getIntExtra("bigdata:synccode", -1);
+            final Bundle bigData = ResultIPC.get().getLargeData(sync);
+
+            ArrayList<String> fileNames = bigData.getStringArrayList("MULTIPLEFILENAMES");
+
             JSONArray res = new JSONArray(fileNames);
             callbackContext.success(res);
 
@@ -141,5 +148,16 @@ public class ImagePicker extends CordovaPlugin {
         } else {
             callbackContext.error("Invalid permission result");
         }
+    }
+
+    /**
+     * Choosing a picture launches another Activity, so we need to implement the
+     * save/restore APIs to handle the case where the CordovaActivity is killed by the OS
+     * before we get the launched Activity's result.
+     *
+     * @see http://cordova.apache.org/docs/en/dev/guide/platforms/android/plugin.html#launching-other-activities
+     */
+    public void onRestoreStateForActivityResult(Bundle state, CallbackContext callbackContext) {
+        this.callbackContext = callbackContext;
     }
 }
